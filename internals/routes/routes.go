@@ -9,5 +9,6 @@ import (
 func SetupRoutes(app *app.Application) *chi.Mux{
 	router := chi.NewRouter()
 	router.Get("/health",app.HealthCheck)
+	router.Post("/create-user",app.UserHandler.CreateUserHandler)
 	return router
 }
