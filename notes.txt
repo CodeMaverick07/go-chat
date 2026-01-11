@@ -1,0 +1,6 @@
+_ "github.com/jackc/pgx/v4/stdlib"
+used as postgres driver 
+"github.com/pressly/goose/v3"
+used for migrations 
+github.com/go-chi/chi/v5
+for routes

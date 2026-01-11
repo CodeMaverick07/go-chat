@@ -1,0 +1,33 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*_test
+
+# Output of 'go build'
+*.out
+
+# Dependency directories
+vendor/
+
+# Go module cache
+.go/
+
+# IDE specific files
+.idea/
+.vscode/
+
+# Operating System artifacts
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+/database 
+./database
+
+database
