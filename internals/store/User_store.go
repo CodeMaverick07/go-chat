@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type PostgresUserStore struct {
 
 type UserStore interface {
 	CreateUser(*User) error
+	IsUniqueUsernameOrEmail(string,string) error
 }
 
 func NewUserStore(db *sql.DB) (*PostgresUserStore) {
@@ -37,5 +39,42 @@ if err != nil {
 	return err
 }
 return nil
+}
+
+func (pg *PostgresUserStore) IsUniqueUsernameOrEmail(
+	value string,
+	what string,
+) error {
+
+	var exists bool
+	var query string
+
+	switch what {
+	case "email":
+		query = `
+			SELECT EXISTS (
+				SELECT 1 FROM users WHERE email = $1
+			)
+		`
+	case "username":
+		query = `
+			SELECT EXISTS (
+				SELECT 1 FROM users WHERE username = $1
+			)
+		`
+	default:
+		return errors.New("invalid uniqueness check type")
+	}
+
+	err := pg.DB.QueryRow(query, value).Scan(&exists)
+	if err != nil {
+		return err
+	}
+
+	if exists {
+		return errors.New(what + " already exists")
+	}
+
+	return nil
 }
 

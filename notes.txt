@@ -4,3 +4,9 @@ used as postgres driver
 used for migrations 
 github.com/go-chi/chi/v5
 for routes
+
+go get github.com/joho/godotenv
+for env
+
+go get gopkg.in/gomail.v2
+for mail

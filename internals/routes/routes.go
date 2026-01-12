@@ -9,6 +9,8 @@ import (
 func SetupRoutes(app *app.Application) *chi.Mux{
 	router := chi.NewRouter()
 	router.Get("/health",app.HealthCheck)
-	router.Post("/create-user",app.UserHandler.CreateUserHandler)
+	router.Post("/verify-otp-and-register-user",app.UserHandler.VerifyOTPAndCreateUserHandler)
+	router.Post("/send-otp",app.UserHandler.SendOTPHandler)
+
 	return router
 }

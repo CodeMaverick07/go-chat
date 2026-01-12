@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"go-chat/internals/api"
+	"go-chat/internals/email"
 	"go-chat/internals/store"
 	"go-chat/migrations"
 	"log"
@@ -16,6 +17,8 @@ type Application struct {
 	Logger *log.Logger
 	DB     *sql.DB
 	UserHandler *api.UserHandler
+	EmailSender *email.Sender
+	
 }
 
 func NewApplication ()(*Application,error){
@@ -28,13 +31,17 @@ func NewApplication ()(*Application,error){
 	if err != nil {
 		panic(err)
 	}
+	emailCfg := email.LoadConfig()
+		emailSender:=email.NewSender(emailCfg.Host,emailCfg.Port,emailCfg.Username,emailCfg.Password)
 
 	userStore := store.NewUserStore(db)
-	newUserHandler:= api.NewUserHandler(userStore,logger)
+	otpStore:=store.NewOTPStore(db,emailSender)
+	newUserHandler:= api.NewUserHandler(userStore,logger,otpStore)
 	return &Application{
 		Logger: logger,
 		DB: db,
 		UserHandler :newUserHandler,
+		EmailSender: emailSender,
 	},nil
 }
 
