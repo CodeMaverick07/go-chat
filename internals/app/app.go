@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go-chat/internals/api"
 	"go-chat/internals/email"
+	"go-chat/internals/middleware"
 	"go-chat/internals/store"
 	"go-chat/migrations"
 	"log"
@@ -13,12 +14,13 @@ import (
 )
 
 type Application struct {
-	Logger       *log.Logger
-	DB           *sql.DB
-	UserHandler  *api.UserHandler
-	EmailSender  *email.Sender
-	TokenHandler *api.TokenHandler
-	AuthHandler  *api.AuthHandler
+	Logger            *log.Logger
+	DB                *sql.DB
+	UserHandler       *api.UserHandler
+	EmailSender       *email.Sender
+	TokenHandler      *api.TokenHandler
+	AuthHandler       *api.AuthHandler
+	MiddlewareHandler middleware.UserMiddleware
 }
 
 func NewApplication() (*Application, error) {
@@ -40,13 +42,15 @@ func NewApplication() (*Application, error) {
 	userHandler := api.NewUserHandler(userStore, logger, otpStore, tokenStore)
 	authHandler := api.NewAuthHandler(logger, userStore, tokenStore, otpStore)
 	tokenHander := api.NewTokenHandler(tokenStore, userStore, logger)
+	middlewareHandler := middleware.UserMiddleware{UserStore: userStore}
 	return &Application{
-		Logger:       logger,
-		DB:           db,
-		UserHandler:  userHandler,
-		EmailSender:  emailSender,
-		TokenHandler: tokenHander,
-		AuthHandler:  authHandler,
+		Logger:            logger,
+		DB:                db,
+		UserHandler:       userHandler,
+		EmailSender:       emailSender,
+		TokenHandler:      tokenHander,
+		AuthHandler:       authHandler,
+		MiddlewareHandler: middlewareHandler ,
 	}, nil
 }
 
