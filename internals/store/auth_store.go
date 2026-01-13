@@ -9,51 +9,51 @@ import (
 	"time"
 )
 
-
 type OTPPurpose string
+
 const (
 	OTPPurposeVerify string = "verify"
-	OTPPurposeLogin string = "login"
+	OTPPurposeLogin  string = "login"
 )
+
 type OTP struct {
-	ID string `json:"id"`
-	Email string `json:"email"`
-	CodeHash string `json:"code_hash"`
-	Purpose OTPPurpose `json:"purpose"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Used bool `json:"used"`
-	Attempts string `json:"attempts"`
-	MaxAttempts string `json:"max_attempts"`
-	CreatedAt string `json:"created_at"`
+	ID          string     `json:"id"`
+	Email       string     `json:"email"`
+	CodeHash    string     `json:"code_hash"`
+	Purpose     OTPPurpose `json:"purpose"`
+	ExpiresAt   time.Time  `json:"expires_at"`
+	Used        bool       `json:"used"`
+	Attempts    string     `json:"attempts"`
+	MaxAttempts string     `json:"max_attempts"`
+	CreatedAt   string     `json:"created_at"`
 }
 
 type PostgresOTPStore struct {
-	DB *sql.DB
+	DB          *sql.DB
 	EmailSender *Email.Sender
-
 }
 
-func NewOTPStore(DB *sql.DB,EmailSender *Email.Sender) *PostgresOTPStore {
+func NewOTPStore(DB *sql.DB, EmailSender *Email.Sender) *PostgresOTPStore {
 	return &PostgresOTPStore{
-		DB: DB,
+		DB:          DB,
 		EmailSender: EmailSender,
 	}
 }
 
-type OTPstore interface{
-	SendOTP(username string,email string,purpose OTPPurpose) error 
-	VerifyOTP(email string,code string,purpose OTPPurpose)(*OTP,error)
+type OTPstore interface {
+	SendOTP(username string, email string, purpose OTPPurpose) error
+	VerifyOTP(email string, code string, purpose OTPPurpose) (*OTP, error)
 }
 
-func (p *PostgresOTPStore) SendOTP(username string,email string,purpose OTPPurpose) error {
-	otp,err := utils.GenerateOTP()
+func (p *PostgresOTPStore) SendOTP(username string, email string, purpose OTPPurpose) error {
+	otp, err := utils.GenerateOTP()
 	if err != nil {
-		fmt.Println("not able to generate otp",err,otp)
+		fmt.Println("not able to generate otp", err, otp)
 		return err
 	}
-		otpHash,err := utils.Hash(otp.Code)
+	otpHash, err := utils.Hash(otp.Code)
 	if err != nil {
-		fmt.Println("not able to hash the otp",err)
+		fmt.Println("not able to hash the otp", err)
 		return err
 	}
 	query := `
@@ -62,20 +62,19 @@ func (p *PostgresOTPStore) SendOTP(username string,email string,purpose OTPPurpo
 	RETURNING id
 	`
 	var id string
-	err = p.DB.QueryRow(query,email,otpHash,purpose,otp.ExpiresAt).Scan(&id)
-	fmt.Println("id:",id)
+	err = p.DB.QueryRow(query, email, otpHash, purpose, otp.ExpiresAt).Scan(&id)
+	fmt.Println("id:", id)
 	if err != nil {
-		fmt.Println("not able run send otp query",err)
-		return err
-	}
-	
-	subject,htmlBody,_:=Email.OTPVerificationTemplate(username,otp.Code)
-	err = p.EmailSender.Send(email,subject,htmlBody)
-	if err != nil {
-		fmt.Println("not able to send otp",err)
+		fmt.Println("not able run send otp query", err)
 		return err
 	}
 
+	subject, htmlBody, _ := Email.OTPVerificationTemplate(username, otp.Code)
+	err = p.EmailSender.Send(email, subject, htmlBody)
+	if err != nil {
+		fmt.Println("not able to send otp", err)
+		return err
+	}
 
 	return nil
 }
@@ -144,6 +143,3 @@ func (p *PostgresOTPStore) VerifyOTP(
 
 	return &otp, nil
 }
-
-
-

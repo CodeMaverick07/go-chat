@@ -16,8 +16,8 @@ import (
 
 type Envelope map[string]interface{}
 
-func WriteJSON(w http.ResponseWriter,status int, data Envelope) error {
-	js, err := json.MarshalIndent(data,""," ")
+func WriteJSON(w http.ResponseWriter, status int, data Envelope) error {
+	js, err := json.MarshalIndent(data, "", " ")
 	if err != nil {
 		return err
 	}
@@ -58,15 +58,15 @@ func GenerateOTP() (*OTP, error) {
 	}, nil
 }
 
-func Hash(value string) (string,error){
-	hash,err := bcrypt.GenerateFromPassword([]byte(value),bcrypt.DefaultCost)
+func Hash(value string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(value), bcrypt.DefaultCost)
 	if err != nil {
-		return "",err
+		return "", err
 	}
-	return string(hash),nil
+	return string(hash), nil
 }
 
-func VerifyHash(hash,value string) error {
+func VerifyHash(hash, value string) error {
 	return bcrypt.CompareHashAndPassword(
 		[]byte(hash),
 		[]byte(value),
