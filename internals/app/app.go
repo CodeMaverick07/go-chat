@@ -18,6 +18,7 @@ type Application struct {
 	UserHandler  *api.UserHandler
 	EmailSender  *email.Sender
 	TokenHandler *api.TokenHandler
+	AuthHandler  *api.AuthHandler
 }
 
 func NewApplication() (*Application, error) {
@@ -36,15 +37,16 @@ func NewApplication() (*Application, error) {
 	userStore := store.NewUserStore(db)
 	otpStore := store.NewOTPStore(db, emailSender)
 	tokenStore := store.NewPostgresTokenStore(db)
-	newUserHandler := api.NewUserHandler(userStore, logger, otpStore)
-
+	userHandler := api.NewUserHandler(userStore, logger, otpStore, tokenStore)
+	authHandler := api.NewAuthHandler(logger, userStore, tokenStore, otpStore)
 	tokenHander := api.NewTokenHandler(tokenStore, userStore, logger)
 	return &Application{
 		Logger:       logger,
 		DB:           db,
-		UserHandler:  newUserHandler,
+		UserHandler:  userHandler,
 		EmailSender:  emailSender,
-		TokenHandler: tokenHander ,
+		TokenHandler: tokenHander,
+		AuthHandler:  authHandler,
 	}, nil
 }
 

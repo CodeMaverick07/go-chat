@@ -1,7 +1,9 @@
 package store
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"time"
 )
@@ -16,6 +18,12 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+var AnonymousUser = &User{}
+
+func (u *User) IsAnonymousUser() bool {
+	return u == AnonymousUser
+}
+
 type PostgresUserStore struct {
 	DB *sql.DB
 }
@@ -24,6 +32,7 @@ type UserStore interface {
 	CreateUser(*User) error
 	IsUniqueUsernameOrEmail(string, string) error
 	GetUserByUserNameOrEmail(value string) (*User, error)
+	GetUserToken(scope, tokenPlainText string) (*User, error)
 }
 
 func NewUserStore(db *sql.DB) *PostgresUserStore {
@@ -32,11 +41,11 @@ func NewUserStore(db *sql.DB) *PostgresUserStore {
 
 func (pg *PostgresUserStore) CreateUser(user *User) error {
 	query := `
-	INSERT INTO users (username,email,password_hash) 
-	VALUES ($1,$2,$3) 
+	INSERT INTO users (username,email,password_hash,scope) 
+	VALUES ($1,$2,$3,$4) 
 	RETURNING id,created_at,updated_at
 `
-	err := pg.DB.QueryRow(query, user.UserName, user.Email, user.Password).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	err := pg.DB.QueryRow(query, user.UserName, user.Email, user.Password, user.Scope).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return err
 	}
@@ -82,7 +91,7 @@ func (pg *PostgresUserStore) IsUniqueUsernameOrEmail(
 
 func (pg *PostgresUserStore) GetUserByUserNameOrEmail(value string) (*User, error) {
 	query := `
-		SELECT id, username, email, password_hash, created_at, updated_at
+		SELECT id, username, email, password_hash, scope, created_at, updated_at
 		FROM users
 		WHERE email = $1 OR username = $1
 		LIMIT 1
@@ -95,6 +104,7 @@ func (pg *PostgresUserStore) GetUserByUserNameOrEmail(value string) (*User, erro
 		&user.UserName,
 		&user.Email,
 		&user.Password,
+		&user.Scope,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -106,5 +116,25 @@ func (pg *PostgresUserStore) GetUserByUserNameOrEmail(value string) (*User, erro
 		return nil, err
 	}
 
+	return user, nil
+}
+
+func (pg *PostgresUserStore) GetUserToken(scope, tokenPlainText string) (*User, error) {
+	tokenHash := sha256.Sum256([]byte(tokenPlainText))
+	tokenHashHex := hex.EncodeToString(tokenHash[:])
+	query := `
+	 SELECT u.id, u.username, u.email, u.password, u.scope, u.created_at, u.updated_at FROM users u
+	 INNER JOIN tokens t on t.user_id = u.id
+	 WHERE t.hash = $1 AND t.scope = $2 AND t.expiry > $3
+	`
+	user := &User{}
+	err := pg.DB.QueryRow(query, tokenHashHex, scope, time.Now()).Scan(&user.ID, &user.UserName, &user.Email, &user.Password, &user.Scope, &user.CreatedAt, &user.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
 	return user, nil
 }

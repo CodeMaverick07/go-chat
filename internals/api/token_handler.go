@@ -11,8 +11,8 @@ import (
 )
 
 type createTokenRequest struct {
-	username string `json:"username"`
-	password string `json:"password"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type TokenHandler struct {
@@ -37,14 +37,14 @@ func (h *TokenHandler) HandleCreateToken(w http.ResponseWriter, r *http.Request)
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "internal server error"})
 		return
 	}
-	user, err := h.UserStore.GetUserByUserNameOrEmail(req.username)
+	user, err := h.UserStore.GetUserByUserNameOrEmail(req.Username)
 	if err != nil || user == nil {
 		h.Logger.Println("ERROR:no user found", err)
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "internal server error"})
 		return
 	}
 
-	err = utils.VerifyHash(user.Password, req.password)
+	err = utils.VerifyHash(user.Password, req.Password)
 	if err != nil {
 		h.Logger.Println("ERROR:password dose not match", err)
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "internal server error"})

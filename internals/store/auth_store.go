@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	Email "go-chat/internals/email"
 	"go-chat/internals/utils"
 	"time"
@@ -48,12 +47,10 @@ type OTPstore interface {
 func (p *PostgresOTPStore) SendOTP(username string, email string, purpose OTPPurpose) error {
 	otp, err := utils.GenerateOTP()
 	if err != nil {
-		fmt.Println("not able to generate otp", err, otp)
 		return err
 	}
 	otpHash, err := utils.Hash(otp.Code)
 	if err != nil {
-		fmt.Println("not able to hash the otp", err)
 		return err
 	}
 	query := `
@@ -63,16 +60,13 @@ func (p *PostgresOTPStore) SendOTP(username string, email string, purpose OTPPur
 	`
 	var id string
 	err = p.DB.QueryRow(query, email, otpHash, purpose, otp.ExpiresAt).Scan(&id)
-	fmt.Println("id:", id)
 	if err != nil {
-		fmt.Println("not able run send otp query", err)
 		return err
 	}
 
 	subject, htmlBody, _ := Email.OTPVerificationTemplate(username, otp.Code)
 	err = p.EmailSender.Send(email, subject, htmlBody)
 	if err != nil {
-		fmt.Println("not able to send otp", err)
 		return err
 	}
 

@@ -18,30 +18,34 @@ type VerifyUserAndRegisterRequest struct {
 	Purpose  string `json:"purpose"`
 }
 type SendOTPRequest struct {
-	Email string `json:"email"`
+	Email   string `json:"email"`
 	Purpose string `json:"purpose"`
 }
 
 type UserHandler struct {
-	UserStore store.UserStore
-	Logger *log.Logger
-	AuthStore store.OTPstore
+	UserStore  store.UserStore
+	Logger     *log.Logger
+	OTPStore   store.OTPstore
+	TokenStore store.TokenStore
 }
 
-func NewUserHandler(UserStore store.UserStore, Logger *log.Logger,AuthStore store.OTPstore) *UserHandler {
+var UserScope = "user"
+
+func NewUserHandler(userStore store.UserStore, logger *log.Logger, authStore store.OTPstore, tokenStore store.TokenStore) *UserHandler {
 	return &UserHandler{
-		UserStore: UserStore,
-		Logger: Logger,
-		AuthStore: AuthStore,
+		UserStore:  userStore,
+		Logger:     logger,
+		OTPStore:   authStore,
+		TokenStore: tokenStore,
 	}
 }
 
-func (u * UserHandler) SendOTPHandler(w http.ResponseWriter,r *http.Request){
+func (u *UserHandler) SendOTPHandler(w http.ResponseWriter, r *http.Request) {
 	var req SendOTPRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		u.Logger.Println("not able to decode send otp",err)
-		utils.WriteJSON(w,http.StatusBadRequest,utils.Envelope{"error":err.Error()})
+		u.Logger.Println("not able to decode send otp", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": err.Error()})
 		return
 	}
 	if req.Email == "" {
@@ -60,24 +64,23 @@ func (u * UserHandler) SendOTPHandler(w http.ResponseWriter,r *http.Request){
 		)
 		return
 	}
-	err = u.UserStore.IsUniqueUsernameOrEmail(req.Email,"email")
+	err = u.UserStore.IsUniqueUsernameOrEmail(req.Email, "email")
 	if err != nil {
-		u.Logger.Println("email is not unique",err)
-		utils.WriteJSON(w,http.StatusBadRequest,utils.Envelope{"error":err.Error()})
+		u.Logger.Println("email is not unique", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": err.Error()})
 		return
 	}
-	
-	err = u.AuthStore.SendOTP("user",req.Email,store.OTPPurpose(req.Purpose))
+
+	err = u.OTPStore.SendOTP("user", req.Email, store.OTPPurpose(req.Purpose))
 	if err != nil {
-		u.Logger.Println("not able to send otp",err)
-		utils.WriteJSON(w,http.StatusBadRequest,utils.Envelope{"error":err.Error()})
+		u.Logger.Println("not able to send otp", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": err.Error()})
 		return
 	}
-	utils.WriteJSON(w,200,utils.Envelope{"data":req.Email})
+	utils.WriteJSON(w, 200, utils.Envelope{"data": req.Email})
 }
 
-
-func (u *UserHandler) VerifyOTPHandler(w http.ResponseWriter,r *http.Request){
+func (u *UserHandler) VerifyOTPHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
@@ -134,7 +137,7 @@ func (u *UserHandler) VerifyOTPAndCreateUserHandler(
 		})
 		return
 	}
-	if _, err := u.AuthStore.VerifyOTP(
+	if _, err := u.OTPStore.VerifyOTP(
 		req.Email,
 		req.OTP,
 		store.OTPPurpose(req.Purpose),
@@ -156,18 +159,27 @@ func (u *UserHandler) VerifyOTPAndCreateUserHandler(
 		UserName:  req.Username,
 		Email:     req.Email,
 		Password:  passwordHash,
+		Scope:     UserScope,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
 	if err := u.UserStore.CreateUser(&user); err != nil {
-		u.Logger.Println("create user:", err)
+		u.Logger.Printf("Error: %v", err)
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
-			"error": err.Error(),
+			"error": "internal server error",
+		})
+		return
+	}
+	token, err := u.TokenStore.CreateNewToken(user.ID, 24*time.Hour, user.Scope)
+	if err != nil {
+		u.Logger.Printf("Error: %v", err)
+		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{
+			"error": "internal server error",
 		})
 		return
 	}
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{
-		"message": "user created successfully",
+		"auth_token": token,
 	})
 }
