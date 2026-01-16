@@ -10,3 +10,5 @@ for env
 
 go get gopkg.in/gomail.v2
 for mail
+
+github.com/gorilla/websocket

@@ -7,6 +7,7 @@ import (
 	"go-chat/internals/email"
 	"go-chat/internals/middleware"
 	"go-chat/internals/store"
+	"go-chat/internals/websockets"
 	"go-chat/migrations"
 	"log"
 	"net/http"
@@ -21,6 +22,7 @@ type Application struct {
 	TokenHandler      *api.TokenHandler
 	AuthHandler       *api.AuthHandler
 	MiddlewareHandler middleware.UserMiddleware
+	WebsocketManager  *websockets.Manager
 }
 
 func NewApplication() (*Application, error) {
@@ -43,6 +45,7 @@ func NewApplication() (*Application, error) {
 	authHandler := api.NewAuthHandler(logger, userStore, tokenStore, otpStore)
 	tokenHander := api.NewTokenHandler(tokenStore, userStore, logger)
 	middlewareHandler := middleware.UserMiddleware{UserStore: userStore}
+	websocketManger := websockets.NewManager(logger)
 	return &Application{
 		Logger:            logger,
 		DB:                db,
@@ -50,7 +53,8 @@ func NewApplication() (*Application, error) {
 		EmailSender:       emailSender,
 		TokenHandler:      tokenHander,
 		AuthHandler:       authHandler,
-		MiddlewareHandler: middlewareHandler ,
+		MiddlewareHandler: middlewareHandler,
+		WebsocketManager:  websocketManger,
 	}, nil
 }
 
