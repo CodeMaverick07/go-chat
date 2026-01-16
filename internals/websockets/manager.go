@@ -1,11 +1,17 @@
 package websockets
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
+)
+
+var (
+	ErrEventNotSupported = errors.New("this event type is not supported")
 )
 
 var (
@@ -22,13 +28,33 @@ type Manager struct {
 	logger      *log.Logger
 	clientsList ClientList
 	sync.RWMutex
-	egress chan []byte
+	handlers map[string]EventHandler
 }
 
 func NewManager(Logger *log.Logger) *Manager {
-	return &Manager{
+	m := &Manager{
 		logger:      Logger,
 		clientsList: make(ClientList),
+		handlers:    make(map[string]EventHandler),
+	}
+	m.SetUpEventHandlers()
+	return m
+}
+func (m *Manager) SetUpEventHandlers() {
+	m.handlers[EventSeedMessage] = func(e Event, c *Client) error {
+		fmt.Println(e)
+		return nil
+	}
+}
+
+func (m *Manager) routeEvent(e Event, c *Client) error {
+	if handler, ok := m.handlers[e.Type]; ok {
+		if err := handler(e, c); err != nil {
+			return err
+		}
+		return nil
+	} else {
+		return ErrEventNotSupported
 	}
 }
 
@@ -44,6 +70,7 @@ func (m *Manager) ServeWS(w http.ResponseWriter, r *http.Request) {
 	client := NewClient(conn, m, m.logger)
 	m.AddClient(client)
 	go client.ReadMessages()
+	go client.WriteMessages()
 }
 
 func (m *Manager) AddClient(client *Client) {

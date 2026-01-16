@@ -35,6 +35,33 @@
 
     <script type="text/javascript">
         var selectedchat = "general";
+        class Event {
+            constructor(type,payload){
+                this.type = type
+                this.payload = payload
+            }
+        }
+
+        function routeEvent(event) {
+            if (event.type == undefined) {
+                alert("message type is undefiend")
+            }
+            switch (event.type){
+                case  "new_message": {
+                    console.log("new message")
+                    break
+                }
+                default: {
+                    console.log("unknown type")
+                    break
+                }
+            }
+        }
+        function sendEvent(type, payload){
+            const event = new Event(type,payload)
+            conn.send(JSON.stringify(event))
+        }
+
         function changeChatRoom() {
             var newchat = document.getElementById("chatroom");
             if (newchat != null && newchat.value != selectedchat) {
@@ -42,6 +69,7 @@
             }
             return false;
         }
+
          
         window.onload = function () {
             document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
@@ -49,6 +77,12 @@
             if (window["WebSocket"]) {
                 console.log("supports websockets");
                 conn = new WebSocket("ws://localhost:9000/ws");
+               conn.onmessage = function(evt) {
+                    console.log(evt);
+                    const eventData = JSON.parse(evt.data)
+                    const event = Object.assign(new Event, eventData)
+                    routeEvent(event)
+                }
             } else {
                 alert("Not supporting websockets");
             }
@@ -57,7 +91,7 @@
             var newmessage = document.getElementById("message");
             if (newmessage != null) {
                 console.log(newmessage);
-                conn.send(newmessage.value);
+                sendEvent("new_message",newmessage.value)
             }
             return false;
         }
