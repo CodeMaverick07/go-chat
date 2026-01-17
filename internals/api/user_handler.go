@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"go-chat/internals/middleware"
 	"go-chat/internals/store"
 	"go-chat/internals/utils"
 	"log"
@@ -28,8 +29,6 @@ type UserHandler struct {
 	OTPStore   store.OTPstore
 	TokenStore store.TokenStore
 }
-
-var UserScope = "user"
 
 func NewUserHandler(userStore store.UserStore, logger *log.Logger, authStore store.OTPstore, tokenStore store.TokenStore) *UserHandler {
 	return &UserHandler{
@@ -159,7 +158,7 @@ func (u *UserHandler) VerifyOTPAndCreateUserHandler(
 		UserName:  req.Username,
 		Email:     req.Email,
 		Password:  passwordHash,
-		Scope:     UserScope,
+		Scope:     utils.UserScope,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -182,4 +181,17 @@ func (u *UserHandler) VerifyOTPAndCreateUserHandler(
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{
 		"auth_token": token,
 	})
+}
+func (u *UserHandler) WebsocketTokenHandler(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUser(r)
+	if user.IsAnonymousUser() {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "user is not logged in"})
+		return
+	}
+	token, err := u.TokenStore.CreateNewToken(user.ID, time.Hour*10, utils.SocketScope)
+	if err != nil {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": err.Error()})
+		return
+	}
+	utils.WriteJSON(w, http.StatusAccepted, utils.Envelope{"socket_token": token})
 }

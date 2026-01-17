@@ -33,6 +33,7 @@ type UserStore interface {
 	IsUniqueUsernameOrEmail(string, string) error
 	GetUserByUserNameOrEmail(value string) (*User, error)
 	GetUserToken(scope, tokenPlainText string) (*User, error)
+	GetUserById(userId string) (*User, error)
 }
 
 func NewUserStore(db *sql.DB) *PostgresUserStore {
@@ -123,7 +124,7 @@ func (pg *PostgresUserStore) GetUserToken(scope, tokenPlainText string) (*User, 
 	tokenHash := sha256.Sum256([]byte(tokenPlainText))
 	tokenHashHex := hex.EncodeToString(tokenHash[:])
 	query := `
-	 SELECT u.id, u.username, u.email, u.password, u.scope, u.created_at, u.updated_at FROM users u
+	 SELECT u.id, u.username, u.email, u.password_hash, u.scope, u.created_at, u.updated_at FROM users u
 	 INNER JOIN tokens t on t.user_id = u.id
 	 WHERE t.hash = $1 AND t.scope = $2 AND t.expiry > $3
 	`
@@ -136,5 +137,34 @@ func (pg *PostgresUserStore) GetUserToken(scope, tokenPlainText string) (*User, 
 	if err != nil {
 		return nil, err
 	}
+	return user, nil
+}
+
+func (pg *PostgresUserStore) GetUserById(userId string) (*User, error) {
+	query := `
+		SELECT u.id, u.username, u.email, u.password_hash, u.scope,
+		       u.created_at, u.updated_at
+		FROM users u
+		WHERE u.id = $1
+	`
+
+	user := &User{}
+	err := pg.DB.QueryRow(query, userId).Scan(
+		&user.ID,
+		&user.UserName,
+		&user.Email,
+		&user.Password,
+		&user.Scope,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, nil // ✅ user not found
+	}
+	if err != nil {
+		return nil, err
+	}
+
 	return user, nil
 }

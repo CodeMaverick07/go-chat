@@ -35,6 +35,7 @@
 
     <script type="text/javascript">
         var selectedchat = "general";
+        let conn = null
         class Event {
             constructor(type,payload){
                 this.type = type
@@ -71,12 +72,13 @@
         }
 
          
-        window.onload = function () {
+        window.onload =async function () {
             document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
             document.getElementById("chatroom-message").onsubmit = sendMessage;
             if (window["WebSocket"]) {
                 console.log("supports websockets");
-                conn = new WebSocket("ws://localhost:9000/ws");
+               
+               conn = new WebSocket("ws://localhost:9000/ws?token=F3TAY44MQSUSJC23OKM4L276F44G3WFIH7ZK2JLGOVKTS2QYC53A");
                conn.onmessage = function(evt) {
                     console.log(evt);
                     const eventData = JSON.parse(evt.data)

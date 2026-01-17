@@ -4,11 +4,40 @@ import (
 	"go-chat/internals/app"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/cors"
 )
 
 func SetupRoutes(app *app.Application) *chi.Mux {
 	router := chi.NewRouter()
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{
+			"http://127.0.0.1:5500",
+			"http://localhost:5500",
+		},
+		AllowedMethods: []string{
+			"GET", "POST", "OPTIONS",
+		},
+		AllowedHeaders: []string{
+			"Accept",
+			"Authorization",
+			"Content-Type",
+		},
+		ExposedHeaders: []string{
+			"Link",
+		},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+	router.Group(func(r chi.Router) {
+		r.Use(app.UserMiddlewareHandler.Authenticate)
+		r.Post("/socket-token", app.UserHandler.WebsocketTokenHandler)
 
+	})
+	router.Group(func(r chi.Router) {
+		r.Use(app.WebSocketMiddlewareHandler.AuthenticateWebsockets)
+		r.Get("/ws", app.WebsocketManager.ServeWS)
+
+	})
 	router.Get("/health", app.HealthCheck)
 	router.Route("/auth", func(r chi.Router) {
 		r.Post("/register/verify-otp", app.UserHandler.VerifyOTPAndCreateUserHandler)
@@ -19,7 +48,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		r.Post("/login/otp", app.AuthHandler.LoginWithEmailandOTP)
 		r.Post("/login/otp/verify", app.AuthHandler.VerifyLoginOTP)
 	})
-	router.Get("/ws", app.WebsocketManager.ServeWS)
+	// router.Get("/ws", app.WebsocketManager.ServeWS)
 
 	return router
 }

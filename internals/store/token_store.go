@@ -21,6 +21,7 @@ type TokenStore interface {
 	Insert(token *tokens.Token) error
 	CreateNewToken(userID string, ttl time.Duration, scope string) (*tokens.Token, error)
 	DeleteAllTokensForUser(userID string, scope string) error
+	
 }
 
 func (p *PostgresTokenStore) Insert(token *tokens.Token) error {

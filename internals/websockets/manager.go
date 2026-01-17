@@ -98,6 +98,6 @@ func checkOrigin(r *http.Request) bool {
 	case "http://localhost:5500":
 		return true
 	default:
-		return false
+		return true
 	}
 }
