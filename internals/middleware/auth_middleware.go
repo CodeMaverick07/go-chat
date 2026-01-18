@@ -37,7 +37,6 @@ func (um *UserMiddleware) Authenticate(next http.Handler) http.Handler {
 
 		var token string
 		authHeader := r.Header.Get("Authorization")
-
 		if authHeader != "" {
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || parts[0] != "Bearer" {
@@ -65,7 +64,6 @@ func (um *UserMiddleware) Authenticate(next http.Handler) http.Handler {
 				utils.Envelope{"error": "invalid token"})
 			return
 		}
-
 		if user == nil {
 			utils.WriteJSON(w, http.StatusUnauthorized,
 				utils.Envelope{"error": "token expired or invalid"})

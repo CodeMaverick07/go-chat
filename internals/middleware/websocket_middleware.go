@@ -20,12 +20,12 @@ func (wm *WebsocketMiddleware) AuthenticateWebsockets(next http.Handler) http.Ha
 				utils.Envelope{"error": "invalid userId"})
 			return
 		}
-		user, err := wm.UserStore.GetUserToken(utils.SocketScope, token)
-		if err != nil {
-			utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "user not present"})
-			return
-		}
-		ctx := context.WithValue(r.Context(), contexkeys.UserID, user.ID)
+	user, err := wm.UserStore.GetUserToken(utils.SocketScope, token)
+	if err != nil || user == nil {
+		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "user not present"})
+		return
+	}
+	ctx := context.WithValue(r.Context(), contexkeys.UserID, user.ID)
 		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})

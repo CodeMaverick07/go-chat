@@ -93,6 +93,7 @@ func (c *Client) WriteMessages() {
 			}
 		case <-ticker.C:
 			c.Connection.SetWriteDeadline(time.Now().Add(5 * time.Second))
+			c.Logger.Println("ping")
 			if err := c.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}

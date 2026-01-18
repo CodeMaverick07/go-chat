@@ -99,7 +99,7 @@
             if (window["WebSocket"]) {
                 console.log("supports websockets");
                
-               conn = new WebSocket("ws://localhost:9000/ws?token=F3TAY44MQSUSJC23OKM4L276F44G3WFIH7ZK2JLGOVKTS2QYC53A");
+               conn = new WebSocket("ws://localhost:9000/ws?token=XJWLSK2TJAH6YAOZVQNQPN6V2OM67THKA6ZNC4OLEXIV6YZVUK3Q");
                conn.onmessage = function(evt) {
                     console.log(evt);
                     const eventData = JSON.parse(evt.data)
