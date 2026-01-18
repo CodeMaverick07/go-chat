@@ -2,7 +2,7 @@ package websockets
 
 import (
 	"errors"
-	"fmt"
+	"go-chat/internals/contexkeys"
 	"log"
 	"net/http"
 	"sync"
@@ -39,10 +39,8 @@ func NewManager(Logger *log.Logger) *Manager {
 	return m
 }
 func (m *Manager) SetUpEventHandlers() {
-	m.handlers[EventSeedMessage] = func(e Event, c *Client) error {
-		fmt.Println(e)
-		return nil
-	}
+	m.handlers[EventSendMessage] = SendMessageHandler
+	m.handlers[EventChangeRoom] = ChatRoomHandler
 }
 
 func (m *Manager) routeEvent(e Event, c *Client) error {
@@ -57,16 +55,23 @@ func (m *Manager) routeEvent(e Event, c *Client) error {
 }
 
 func (m *Manager) ServeWS(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(contexkeys.UserID).(string)
+	if !ok || userID == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	conn, err := webSocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		m.logger.Println("upgrade error:", err)
 		return
 	}
 
-	m.logger.Println("client connected")
+	m.logger.Println("client connected:", userID)
 
-	client := NewClient(conn, m, m.logger)
+	client := NewClient(conn, m, m.logger, userID)
 	m.AddClient(client)
+
 	go client.ReadMessages()
 	go client.WriteMessages()
 }
@@ -84,6 +89,7 @@ func (m *Manager) RemoveClient(client *Client) {
 
 	if _, ok := m.clientsList[client]; ok {
 		client.Connection.Close()
+		close(client.egress)
 		delete(m.clientsList, client)
 		m.logger.Println("client disconnected")
 	}
@@ -98,6 +104,6 @@ func checkOrigin(r *http.Request) bool {
 	case "http://localhost:5500":
 		return true
 	default:
-		return true
+		return false
 	}
 }

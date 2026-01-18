@@ -34,6 +34,20 @@
 
 
     <script type="text/javascript">
+         class NewMessageEvent {
+            constructor(message, from, sent) {
+                this.message = message;
+                this.from = from;
+                this.sent = sent;
+            }
+        }
+                class SendMessageEvent {
+            constructor(message, from) {
+                this.message = message;
+                this.from = from;
+            }
+        }
+
         var selectedchat = "general";
         let conn = null
         class Event {
@@ -63,10 +77,17 @@
             conn.send(JSON.stringify(event))
         }
 
-        function changeChatRoom() {
+      function changeChatRoom() {
+            // Change Header to reflect the Changed chatroom
             var newchat = document.getElementById("chatroom");
             if (newchat != null && newchat.value != selectedchat) {
-                console.log(newchat);
+                selectedchat = newchat.value;
+                header = document.getElementById("chat-header").innerHTML = "Currently in chat: " + selectedchat;
+
+                let changeEvent = new ChangeChatRoomEvent(selectedchat);
+                sendEvent("change_room", changeEvent);
+                textarea = document.getElementById("chatmessages");
+                textarea.innerHTML = `You changed room into: ${selectedchat}`;
             }
             return false;
         }
@@ -89,13 +110,44 @@
                 alert("Not supporting websockets");
             }
         };
-         function sendMessage() {
+      function sendMessage() {
             var newmessage = document.getElementById("message");
             if (newmessage != null) {
-                console.log(newmessage);
-                sendEvent("new_message",newmessage.value)
+                let outgoingEvent = new SendMessageEvent(newmessage.value, "percy");
+                sendEvent("send_message", outgoingEvent)
             }
             return false;
+        }
+           function appendChatMessage(messageEvent) {
+            var date = new Date(messageEvent.sent);
+            // format message
+            const formattedMsg = `${date.toLocaleString()}: ${messageEvent.message}`;
+            // Append Message
+            textarea = document.getElementById("chatmessages");
+            textarea.innerHTML = textarea.innerHTML + "\n" + formattedMsg;
+            textarea.scrollTop = textarea.scrollHeight;
+        }
+             function routeEvent(event) {
+
+            if (event.type === undefined) {
+                alert("no 'type' field in event");
+            }
+            switch (event.type) {
+                case "new_message":
+                    // Format payload
+                    const messageEvent = Object.assign(new NewMessageEvent, event.payload);
+                    appendChatMessage(messageEvent);
+                    break;
+                default:
+                    alert("unsupported message type");
+                    break;
+            }
+
+        }
+        class ChangeChatRoomEvent {
+            constructor(name) {
+                this.name = name;
+            }
         }
     </script>
 

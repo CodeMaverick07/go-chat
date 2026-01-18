@@ -20,14 +20,17 @@ type Client struct {
 	Manager    *Manager
 	Logger     *log.Logger
 	egress     chan Event
+	chatroom   string
+	UserID     string
 }
 
-func NewClient(connection *websocket.Conn, manager *Manager, logger *log.Logger) *Client {
+func NewClient(connection *websocket.Conn, manager *Manager, logger *log.Logger, userID string) *Client {
 	return &Client{
 		Connection: connection,
 		Manager:    manager,
 		Logger:     logger,
-		egress:     make(chan Event),
+		egress:     make(chan Event, 10),
+		UserID:     userID,
 	}
 }
 
@@ -70,31 +73,27 @@ func (c *Client) ReadMessages() {
 
 	}
 }
-
 func (c *Client) WriteMessages() {
 	ticker := time.NewTicker(pingInterval)
-	defer func() {
-		ticker.Stop()
-	}()
+	defer ticker.Stop()
+
 	for {
 		select {
 		case message, ok := <-c.egress:
 			if !ok {
 				return
 			}
+			c.Connection.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			data, err := json.Marshal(message)
 			if err != nil {
-				c.Logger.Println(err)
-				return // closes the connection, should we really
+				return
 			}
-
 			if err := c.Connection.WriteMessage(websocket.TextMessage, data); err != nil {
-				c.Logger.Println(err)
+				return
 			}
 		case <-ticker.C:
-			c.Logger.Println("ping")
+			c.Connection.SetWriteDeadline(time.Now().Add(5 * time.Second))
 			if err := c.Connection.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Println("writemsg: ", err)
 				return
 			}
 		}

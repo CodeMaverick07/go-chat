@@ -48,7 +48,5 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		r.Post("/login/otp", app.AuthHandler.LoginWithEmailandOTP)
 		r.Post("/login/otp/verify", app.AuthHandler.VerifyLoginOTP)
 	})
-	// router.Get("/ws", app.WebsocketManager.ServeWS)
-
 	return router
 }

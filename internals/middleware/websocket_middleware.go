@@ -1,7 +1,8 @@
 package middleware
 
 import (
-	"fmt"
+	"context"
+	"go-chat/internals/contexkeys"
 	"go-chat/internals/store"
 	"go-chat/internals/utils"
 	"net/http"
@@ -13,9 +14,7 @@ type WebsocketMiddleware struct {
 
 func (wm *WebsocketMiddleware) AuthenticateWebsockets(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("1")
 		token := r.URL.Query().Get("token")
-		fmt.Println("2", token)
 		if token == "" {
 			utils.WriteJSON(w, http.StatusUnauthorized,
 				utils.Envelope{"error": "invalid userId"})
@@ -24,8 +23,10 @@ func (wm *WebsocketMiddleware) AuthenticateWebsockets(next http.Handler) http.Ha
 		user, err := wm.UserStore.GetUserToken(utils.SocketScope, token)
 		if err != nil {
 			utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": "user not present"})
+			return
 		}
-		fmt.Print(user)
+		ctx := context.WithValue(r.Context(), contexkeys.UserID, user.ID)
+		r = r.WithContext(ctx)
 		next.ServeHTTP(w, r)
 	})
 
