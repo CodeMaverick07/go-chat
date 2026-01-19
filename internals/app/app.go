@@ -7,6 +7,7 @@ import (
 	"go-chat/internals/email"
 	"go-chat/internals/middleware"
 	"go-chat/internals/store"
+	"go-chat/internals/websockets"
 	"go-chat/migrations"
 	"log"
 	"net/http"
@@ -14,13 +15,17 @@ import (
 )
 
 type Application struct {
-	Logger            *log.Logger
-	DB                *sql.DB
-	UserHandler       *api.UserHandler
-	EmailSender       *email.Sender
-	TokenHandler      *api.TokenHandler
-	AuthHandler       *api.AuthHandler
-	MiddlewareHandler middleware.UserMiddleware
+	Logger                     *log.Logger
+	DB                         *sql.DB
+	UserHandler                *api.UserHandler
+	EmailSender                *email.Sender
+	TokenHandler               *api.TokenHandler
+	AuthHandler                *api.AuthHandler
+	MessageHandler             *api.MessageHandler
+	ConversationHandler        *api.ConversationHandler
+	UserMiddlewareHandler      middleware.UserMiddleware
+	WebsocketManager           *websockets.Manager
+	WebSocketMiddlewareHandler middleware.WebsocketMiddleware
 }
 
 func NewApplication() (*Application, error) {
@@ -35,22 +40,31 @@ func NewApplication() (*Application, error) {
 	}
 	emailCfg := email.LoadConfig()
 	emailSender := email.NewSender(emailCfg.Host, emailCfg.Port, emailCfg.Username, emailCfg.Password)
-
+	conversationStore := store.NewPostgresConversationStore(db)
+	messageStore := store.NewPostgresMessageStore(db)
 	userStore := store.NewUserStore(db)
 	otpStore := store.NewOTPStore(db, emailSender)
 	tokenStore := store.NewPostgresTokenStore(db)
 	userHandler := api.NewUserHandler(userStore, logger, otpStore, tokenStore)
 	authHandler := api.NewAuthHandler(logger, userStore, tokenStore, otpStore)
 	tokenHander := api.NewTokenHandler(tokenStore, userStore, logger)
-	middlewareHandler := middleware.UserMiddleware{UserStore: userStore}
+	conversationHandler := api.NewConversationHandler(messageStore, conversationStore, logger)
+	messageHandler := api.NewMessageHandler(messageStore, conversationStore, logger)
+	userMiddlewareHandler := middleware.UserMiddleware{UserStore: userStore}
+	websocketMiddlewareHandler := middleware.WebsocketMiddleware{UserStore: userStore}
+	websocketManger := websockets.NewManager(logger)
 	return &Application{
-		Logger:            logger,
-		DB:                db,
-		UserHandler:       userHandler,
-		EmailSender:       emailSender,
-		TokenHandler:      tokenHander,
-		AuthHandler:       authHandler,
-		MiddlewareHandler: middlewareHandler ,
+		Logger:                     logger,
+		DB:                         db,
+		UserHandler:                userHandler,
+		EmailSender:                emailSender,
+		TokenHandler:               tokenHander,
+		AuthHandler:                authHandler,
+		UserMiddlewareHandler:      userMiddlewareHandler,
+		WebsocketManager:           websocketManger,
+		WebSocketMiddlewareHandler: websocketMiddlewareHandler,
+		ConversationHandler:        conversationHandler,
+		MessageHandler:             messageHandler,
 	}, nil
 }
 

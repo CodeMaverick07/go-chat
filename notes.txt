@@ -10,3 +10,9 @@ for env
 
 go get gopkg.in/gomail.v2
 for mail
+
+github.com/gorilla/websocket
+
+go get github.com/go-chi/cors
+
+github.com/google/uuid

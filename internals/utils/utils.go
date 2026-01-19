@@ -14,6 +14,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+var UserScope = "user"
+var SocketScope = "socket"
+
 type Envelope map[string]interface{}
 
 func WriteJSON(w http.ResponseWriter, status int, data Envelope) error {
@@ -27,7 +30,7 @@ func WriteJSON(w http.ResponseWriter, status int, data Envelope) error {
 	return nil
 }
 
-func ReadParamID(r *http.Request) (int64, error) {
+func ReadParamIDInt(r *http.Request) (int64, error) {
 	paramId := chi.URLParam(r, "id")
 	if paramId == "" {
 		return 0, errors.New("invalid id parameter")
@@ -71,4 +74,13 @@ func VerifyHash(hash, value string) error {
 		[]byte(hash),
 		[]byte(value),
 	)
+}
+
+func ReadParamIdStr(r *http.Request) (string, error) {
+	paramId := chi.URLParam(r, "id")
+	if paramId == "" {
+		return "", errors.New("invalid param id")
+	}
+	return paramId, nil
+
 }

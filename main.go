@@ -18,6 +18,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	r := routes.SetupRoutes(app)
 	defer app.DB.Close()
 	app.Logger.Println("first log from main.go")

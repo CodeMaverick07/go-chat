@@ -6,6 +6,8 @@ import (
 	"encoding/base32"
 	"encoding/hex"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -15,12 +17,12 @@ const (
 type Token struct {
 	PlainText string    `json:"token"`
 	Hash      string    `json:"-"`
-	UserId    string    `json:"-"`
+	UserId    uuid.UUID `json:"-"`
 	Expiry    time.Time `json:"expiry"`
 	Scope     string    `json:"-"`
 }
 
-func GenerateToken(UserId string, ttl time.Duration, scope string) (*Token, error) {
+func GenerateToken(UserId uuid.UUID, ttl time.Duration, scope string) (*Token, error) {
 	token := &Token{
 		UserId: UserId,
 		Expiry: time.Now().Add(ttl),

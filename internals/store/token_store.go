@@ -5,6 +5,8 @@ import (
 	"go-chat/internals/tokens"
 
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type PostgresTokenStore struct {
@@ -19,8 +21,8 @@ func NewPostgresTokenStore(db *sql.DB) *PostgresTokenStore {
 
 type TokenStore interface {
 	Insert(token *tokens.Token) error
-	CreateNewToken(userID string, ttl time.Duration, scope string) (*tokens.Token, error)
-	DeleteAllTokensForUser(userID string, scope string) error
+	CreateNewToken(userID uuid.UUID, ttl time.Duration, scope string) (*tokens.Token, error)
+	DeleteAllTokensForUser(userID uuid.UUID, scope string) error
 }
 
 func (p *PostgresTokenStore) Insert(token *tokens.Token) error {
@@ -32,7 +34,7 @@ func (p *PostgresTokenStore) Insert(token *tokens.Token) error {
 	return err
 }
 
-func (p *PostgresTokenStore) CreateNewToken(userID string, ttl time.Duration, scope string) (*tokens.Token, error) {
+func (p *PostgresTokenStore) CreateNewToken(userID uuid.UUID, ttl time.Duration, scope string) (*tokens.Token, error) {
 	token, err := tokens.GenerateToken(userID, ttl, scope)
 	if err != nil {
 		return nil, err
@@ -41,7 +43,7 @@ func (p *PostgresTokenStore) CreateNewToken(userID string, ttl time.Duration, sc
 	return token, err
 }
 
-func (p *PostgresTokenStore) DeleteAllTokensForUser(userID string, scope string) error {
+func (p *PostgresTokenStore) DeleteAllTokensForUser(userID uuid.UUID, scope string) error {
 	query := `
 	DELETE FROM tokens
 	WHERE scope = $1 AND user_id = $2
