@@ -6,6 +6,8 @@ import (
 	Email "go-chat/internals/email"
 	"go-chat/internals/utils"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type OTPPurpose string
@@ -16,7 +18,7 @@ const (
 )
 
 type OTP struct {
-	ID          string     `json:"id"`
+	ID          uuid.UUID  `json:"id"`
 	Email       string     `json:"email"`
 	CodeHash    string     `json:"code_hash"`
 	Purpose     OTPPurpose `json:"purpose"`

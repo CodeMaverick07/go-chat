@@ -6,10 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	ID        string    `json:"id"`
+	ID        uuid.UUID `json:"id"`
 	UserName  string    `json:"username"`
 	Email     string    `json:"email"`
 	Password  string    `json:"-"`
@@ -33,7 +35,7 @@ type UserStore interface {
 	IsUniqueUsernameOrEmail(string, string) error
 	GetUserByUserNameOrEmail(value string) (*User, error)
 	GetUserToken(scope, tokenPlainText string) (*User, error)
-	GetUserById(userId string) (*User, error)
+	GetUserById(userId uuid.UUID) (*User, error)
 }
 
 func NewUserStore(db *sql.DB) *PostgresUserStore {
@@ -140,7 +142,7 @@ func (pg *PostgresUserStore) GetUserToken(scope, tokenPlainText string) (*User, 
 	return user, nil
 }
 
-func (pg *PostgresUserStore) GetUserById(userId string) (*User, error) {
+func (pg *PostgresUserStore) GetUserById(userId uuid.UUID) (*User, error) {
 	query := `
 		SELECT u.id, u.username, u.email, u.password_hash, u.scope,
 		       u.created_at, u.updated_at
@@ -160,7 +162,7 @@ func (pg *PostgresUserStore) GetUserById(userId string) (*User, error) {
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, nil // ✅ user not found
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

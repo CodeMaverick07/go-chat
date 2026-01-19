@@ -14,3 +14,5 @@ for mail
 github.com/gorilla/websocket
 
 go get github.com/go-chi/cors
+
+github.com/google/uuid
