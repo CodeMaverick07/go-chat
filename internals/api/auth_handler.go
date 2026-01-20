@@ -66,8 +66,12 @@ func (h *AuthHandler) LoginWithEmailOrUsernameAndPassword(w http.ResponseWriter,
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "internal server error"})
 		return
 	}
+	var payload = map[string]interface{}{
+		"user_id":    user.ID,
+		"auth_token": token,
+	}
 
-	utils.WriteJSON(w, http.StatusAccepted, utils.Envelope{"auth_token": token})
+	utils.WriteJSON(w, http.StatusAccepted, payload)
 }
 
 func (h *AuthHandler) LoginWithEmailandOTP(w http.ResponseWriter, r *http.Request) {
@@ -133,7 +137,11 @@ func (h *AuthHandler) VerifyLoginOTP(w http.ResponseWriter, r *http.Request) {
 		utils.WriteJSON(w, http.StatusBadRequest, utils.Envelope{"error": "internal server error"})
 		return
 	}
+	var payload = map[string]interface{}{
+		"user_id":    user.ID,
+		"auth_token": token,
+	}
 
-	utils.WriteJSON(w, http.StatusAccepted, utils.Envelope{"auth_token": token})
+	utils.WriteJSON(w, http.StatusAccepted, payload)
 
 }

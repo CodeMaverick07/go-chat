@@ -179,6 +179,7 @@ func (u *UserHandler) VerifyOTPAndCreateUserHandler(
 		return
 	}
 	utils.WriteJSON(w, http.StatusCreated, utils.Envelope{
+		"user_id":    user.ID,
 		"auth_token": token,
 	})
 }
@@ -193,5 +194,9 @@ func (u *UserHandler) WebsocketTokenHandler(w http.ResponseWriter, r *http.Reque
 		utils.WriteJSON(w, http.StatusUnauthorized, utils.Envelope{"error": err.Error()})
 		return
 	}
-	utils.WriteJSON(w, http.StatusAccepted, utils.Envelope{"socket_token": token})
+	var payload = map[string]interface{}{
+		"user_id":      user.ID,
+		"socket_token": token,
+	}
+	utils.WriteJSON(w, http.StatusAccepted, payload)
 }

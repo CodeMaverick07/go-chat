@@ -26,45 +26,99 @@ type Application struct {
 	UserMiddlewareHandler      middleware.UserMiddleware
 	WebsocketManager           *websockets.Manager
 	WebSocketMiddlewareHandler middleware.WebsocketMiddleware
+	MediaHandler               *api.MediaHandler
 }
 
 func NewApplication() (*Application, error) {
+	// Logger
 	logger := log.New(os.Stdout, "", log.Ldate|log.Ltime)
+
+	// Database
 	db, err := store.Open()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	err = store.MigrateFS(db, migrations.FS, ".")
-	if err != nil {
-		panic(err)
+
+	if err := store.MigrateFS(db, migrations.FS, "."); err != nil {
+		return nil, err
 	}
+
+	// External / Infra Services
 	emailCfg := email.LoadConfig()
-	emailSender := email.NewSender(emailCfg.Host, emailCfg.Port, emailCfg.Username, emailCfg.Password)
-	conversationStore := store.NewPostgresConversationStore(db)
-	messageStore := store.NewPostgresMessageStore(db)
+	emailSender := email.NewSender(
+		emailCfg.Host,
+		emailCfg.Port,
+		emailCfg.Username,
+		emailCfg.Password,
+	)
+
+	// Stores (Repositories)
 	userStore := store.NewUserStore(db)
 	otpStore := store.NewOTPStore(db, emailSender)
 	tokenStore := store.NewPostgresTokenStore(db)
-	userHandler := api.NewUserHandler(userStore, logger, otpStore, tokenStore)
-	authHandler := api.NewAuthHandler(logger, userStore, tokenStore, otpStore)
-	tokenHander := api.NewTokenHandler(tokenStore, userStore, logger)
-	conversationHandler := api.NewConversationHandler(messageStore, conversationStore, logger)
-	messageHandler := api.NewMessageHandler(messageStore, conversationStore, logger)
-	userMiddlewareHandler := middleware.UserMiddleware{UserStore: userStore}
-	websocketMiddlewareHandler := middleware.WebsocketMiddleware{UserStore: userStore}
-	websocketManger := websockets.NewManager(logger)
+	conversationStore := store.NewPostgresConversationStore(db)
+	messageStore := store.NewPostgresMessageStore(db)
+
+	// Handlers (API Layer)
+	userHandler := api.NewUserHandler(
+		userStore,
+		logger,
+		otpStore,
+		tokenStore,
+	)
+
+	authHandler := api.NewAuthHandler(
+		logger,
+		userStore,
+		tokenStore,
+		otpStore,
+	)
+
+	tokenHandler := api.NewTokenHandler(
+		tokenStore,
+		userStore,
+		logger,
+	)
+
+	conversationHandler := api.NewConversationHandler(
+		messageStore,
+		conversationStore,
+		logger,
+	)
+
+	messageHandler := api.NewMessageHandler(
+		messageStore,
+		conversationStore,
+		logger,
+	)
+	mediaHandler := api.NewMediaHandler(messageHandler, conversationHandler, logger)
+
+	// Middleware
+	userMiddlewareHandler := middleware.UserMiddleware{
+		UserStore: userStore,
+	}
+
+	websocketMiddlewareHandler := middleware.WebsocketMiddleware{
+		UserStore: userStore,
+	}
+	websocketManager := websockets.NewManager(logger, messageHandler, conversationHandler)
+
+	// Application
 	return &Application{
-		Logger:                     logger,
-		DB:                         db,
-		UserHandler:                userHandler,
-		EmailSender:                emailSender,
-		TokenHandler:               tokenHander,
-		AuthHandler:                authHandler,
+		Logger:           logger,
+		DB:               db,
+		EmailSender:      emailSender,
+		WebsocketManager: websocketManager,
+
+		UserHandler:         userHandler,
+		AuthHandler:         authHandler,
+		TokenHandler:        tokenHandler,
+		ConversationHandler: conversationHandler,
+		MessageHandler:      messageHandler,
+
 		UserMiddlewareHandler:      userMiddlewareHandler,
-		WebsocketManager:           websocketManger,
 		WebSocketMiddlewareHandler: websocketMiddlewareHandler,
-		ConversationHandler:        conversationHandler,
-		MessageHandler:             messageHandler,
+		MediaHandler:               mediaHandler,
 	}, nil
 }
 

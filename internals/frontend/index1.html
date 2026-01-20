@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test Client</title>
+    <style>
+        body { 
+            font-family: Arial; 
+            max-width: 800px; 
+            margin: 50px auto; 
+            padding: 20px;
+        }
+        #messages { 
+            border: 1px solid #ccc; 
+            height: 400px; 
+            overflow-y: scroll; 
+            padding: 10px; 
+            margin-bottom: 10px; 
+            background: #f9f9f9;
+        }
+        .message { 
+            margin: 5px 0; 
+            padding: 8px; 
+            background: white; 
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        .own-message { 
+            background: #d4edda; 
+        }
+        .system-message {
+            background: #fff3cd;
+            font-style: italic;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        input, button { 
+            padding: 10px; 
+            margin: 5px; 
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        input { 
+            width: 60%; 
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .connecting {
+            background: #fff3cd;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat Test Client</h1>
+    
+    <div>
+        <input id="userId" type="text" placeholder="Your User ID (UUID)" />
+        <input id="token" type="text" placeholder="Your auth token" />
+        <button onclick="connect()" id="connectBtn">Connect</button>
+        <button onclick="disconnect()" id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+    
+    <div id="status" class="disconnected">Disconnected</div>
+    
+    <div id="messages"></div>
+    
+    <div>
+        <input id="recipientId" type="text" placeholder="Recipient User ID (UUID)" />
+        <input id="messageInput" type="text" placeholder="Type a message..." onkeypress="handleKeyPress(event)" />
+        <button onclick="sendMessage()" id="sendBtn" disabled>Send</button>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <button onclick="getConversations()" id="getConvBtn" disabled>Get Conversations</button>
+        <button onclick="uploadFile()" id="uploadBtn" disabled>Upload Image</button>
+        <input id="fileInput" type="file" style="display:none" onchange="handleFileSelect(event)" />
+    </div>
+
+    <script>
+        let ws = null;
+        let currentUserId = null;
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 5;
+        let reconnectDelay = 1000;
+        let reconnectTimer = null;
+        let pingTimer = null;
+
+        function connect() {
+            // Clear any existing reconnect timer
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+
+            const token = document.getElementById('token').value.trim();
+            const userId = document.getElementById('userId').value.trim();
+            
+            if (!token) {
+                alert('Please enter auth token');
+                return;
+            }
+            
+            if (!userId) {
+                alert('Please enter your User ID');
+                return;
+            }
+
+            currentUserId = userId;
+            
+            // Update UI
+            setStatus('Connecting...', 'connecting');
+            document.getElementById('connectBtn').disabled = true;
+            
+            try {
+                // Close existing connection if any
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+
+                // Create WebSocket connection
+                ws = new WebSocket(`ws://localhost:9000/ws?token=${token}`);
+                
+                ws.onopen = () => {
+                    console.log('✓ WebSocket connected');
+                    setStatus('Connected', 'connected');
+                    reconnectAttempts = 0;
+                    reconnectDelay = 1000;
+                    
+                    // Enable UI controls
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+                    document.getElementById('getConvBtn').disabled = false;
+                    document.getElementById('uploadBtn').disabled = false;
+                    
+                    addSystemMessage('Connected to server');
+                };
+                
+                ws.onmessage = (event) => {
+                    console.log('← Received:', event.data);
+                    
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleIncomingEvent(message);
+                    } catch (err) {
+                        console.error('Error parsing message:', err);
+                        addErrorMessage('Invalid message received: ' + event.data);
+                    }
+                };
+                
+                ws.onerror = (error) => {
+                    console.error('✗ WebSocket error:', error);
+                    addErrorMessage('Connection error occurred');
+                };
+                
+                ws.onclose = (event) => {
+                    console.log('✗ WebSocket closed:', event.code, event.reason);
+                    setStatus('Disconnected', 'disconnected');
+                    
+                    // Disable UI controls
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    document.getElementById('sendBtn').disabled = true;
+                    document.getElementById('getConvBtn').disabled = true;
+                    document.getElementById('uploadBtn').disabled = true;
+                    
+                    addSystemMessage(`Disconnected: ${event.reason || 'Connection closed'} (code: ${event.code})`);
+                    
+                    // Clear ws reference
+                    ws = null;
+                    
+                    // Attempt reconnection if not a normal closure
+                    if (event.code !== 1000 && reconnectAttempts < maxReconnectAttempts) {
+                        scheduleReconnect();
+                    }
+                };
+                
+            } catch (error) {
+                console.error('Error creating WebSocket:', error);
+                addErrorMessage('Failed to connect: ' + error.message);
+                setStatus('Disconnected', 'disconnected');
+                document.getElementById('connectBtn').disabled = false;
+            }
+        }
+
+        function disconnect() {
+            console.log('Manual disconnect requested');
+            
+            // Clear reconnect timer
+            if (reconnectTimer) {
+                clearTimeout(reconnectTimer);
+                reconnectTimer = null;
+            }
+            
+            // Reset reconnect attempts
+            reconnectAttempts = maxReconnectAttempts;
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close(1000, 'User requested disconnect');
+            }
+            
+            ws = null;
+        }
+
+        function scheduleReconnect() {
+            if (reconnectTimer) return;
+            
+            reconnectAttempts++;
+            const delay = reconnectDelay * reconnectAttempts;
+            
+            console.log(`Scheduling reconnect attempt ${reconnectAttempts}/${maxReconnectAttempts} in ${delay}ms`);
+            addSystemMessage(`Reconnecting in ${delay/1000} seconds... (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+            
+            reconnectTimer = setTimeout(() => {
+                reconnectTimer = null;
+                connect();
+            }, delay);
+        }
+
+        function handleIncomingEvent(event) {
+            console.log('Handling event:', event.type);
+            
+            switch(event.type) {
+                case 'new_message':
+                    handleNewMessage(event.payload);
+                    break;
+                    
+                case 'conversations_list':
+                    console.log('Conversations:', event.payload);
+                    displayConversations(event.payload.conversations);
+                    break;
+                    
+                case 'messages_list':
+                    console.log('Messages:', event.payload);
+                    displayMessages(event.payload.messages);
+                    break;
+                
+                case 'error':
+                    addErrorMessage('Server error: ' + JSON.stringify(event.payload));
+                    break;
+                    
+                case 'typing_indicator':
+                    handleTypingIndicator(event.payload);
+                    break;
+                    
+                default:
+                    console.log('Unknown event type:', event.type, event.payload);
+                    addSystemMessage('Received: ' + event.type);
+            }
+        }
+
+        function handleNewMessage(payload) {
+            const isOwnMessage = payload.sender_id === currentUserId;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message' + (isOwnMessage ? ' own-message' : '');
+            
+            const time = new Date(payload.created_at).toLocaleTimeString();
+            msgDiv.innerHTML = `
+                <small>${time} - ${isOwnMessage ? 'You' : payload.sender_id}</small><br>
+                ${escapeHtml(payload.content)}
+            `;
+            
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function handleTypingIndicator(payload) {
+            console.log('User typing:', payload);
+            // Implement typing indicator UI here
+        }
+
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to WebSocket');
+                return;
+            }
+            
+            const recipientId = document.getElementById('recipientId').value.trim();
+            const messageText = document.getElementById('messageInput').value.trim();
+            
+            if (!recipientId) {
+                alert('Please enter recipient ID');
+                return;
+            }
+            
+            if (!messageText) {
+                alert('Please enter a message');
+                return;
+            }
+            
+            const event = {
+                type: 'send_message',
+                payload: {
+                    recipient_id: recipientId,
+                    content: messageText,
+                    message_type: 'text'
+                }
+            };
+            
+            console.log('→ Sending:', event);
+            
+            try {
+                ws.send(JSON.stringify(event));
+                document.getElementById('messageInput').value = '';
+            } catch (error) {
+                console.error('Error sending message:', error);
+                addErrorMessage('Failed to send message: ' + error.message);
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function getConversations() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to WebSocket');
+                return;
+            }
+            
+            const event = {
+                type: 'get_conversations',
+                payload: {}
+            };
+            
+            console.log('→ Requesting conversations');
+            ws.send(JSON.stringify(event));
+        }
+
+        function displayConversations(conversations) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<h3>Your Conversations:</h3>';
+            
+            if (!conversations || conversations.length === 0) {
+                messagesDiv.innerHTML += '<p>No conversations found</p>';
+                return;
+            }
+            
+            conversations.forEach(conv => {
+                const div = document.createElement('div');
+                div.className = 'message';
+                div.innerHTML = `
+                    <strong>${conv.type === 'group' ? conv.name : 'Direct Chat'}</strong><br>
+                    ID: ${conv.id}<br>
+                    Participants: ${conv.participant_count}<br>
+                    Unread: ${conv.unread_count}<br>
+                    ${conv.last_message ? 'Last: ' + escapeHtml(conv.last_message.content) : 'No messages'}
+                `;
+                messagesDiv.appendChild(div);
+            });
+        }
+
+        function displayMessages(messages) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<h3>Messages:</h3>';
+            
+            if (!messages || messages.length === 0) {
+                messagesDiv.innerHTML += '<p>No messages found</p>';
+                return;
+            }
+            
+            messages.reverse().forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'message';
+                const time = new Date(msg.created_at).toLocaleTimeString();
+                div.innerHTML = `
+                    <small>${time} - ${msg.sender_id}</small><br>
+                    ${escapeHtml(msg.content)}
+                `;
+                messagesDiv.appendChild(div);
+            });
+        }
+
+        function setStatus(text, className) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = text;
+            statusDiv.className = className;
+        }
+
+        function addSystemMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'message system-message';
+            div.textContent = `[SYSTEM] ${text}`;
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addErrorMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'message error-message';
+            div.textContent = `[ERROR] ${text}`;
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.appendChild(div);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function uploadFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const token = document.getElementById('token').value;
+            const recipientId = document.getElementById('recipientId').value;
+            
+            if (!recipientId) {
+                alert('Please enter recipient ID first');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('recipient_id', recipientId);
+            formData.append('caption', 'Check this out!');
+            
+            try {
+                addSystemMessage('Uploading file...');
+                
+                const response = await fetch('http://localhost:9000/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+                
+                const result = await response.json();
+                console.log('Upload result:', result);
+                addSystemMessage('File uploaded successfully!');
+            } catch (error) {
+                console.error('Upload error:', error);
+                addErrorMessage('Upload failed: ' + error.message);
+            }
+        }
+
+        // Auto-focus message input when page loads
+        window.addEventListener('load', () => {
+            document.getElementById('userId').focus();
+        });
+    </script>
+</body>
+</html>

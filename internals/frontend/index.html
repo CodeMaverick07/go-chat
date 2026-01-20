@@ -1,174 +1,205 @@
+<!-- test-client.html -->
 <!DOCTYPE html>
-<html lang="en">
-
+<html>
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-    <title>PP - Websockets</title>
+    <title>Chat Test Client</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 50px auto; }
+        #messages { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+        .message { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .own-message { background: #d4edda; }
+        input, button { padding: 10px; margin: 5px; }
+        input { width: 60%; }
+    </style>
 </head>
-
 <body>
-    <div class="center">
-        <h1>Amazing Chat Application</h1>
-        <h3 id="chat-header">Currently in chat: general</h3>
-        <form id="chatroom-selection">
-            <label for="chatroom">Chatroom:</label>
-            <input type="text" id="chatroom" name="chatroom"><br><br>
-            <input type="submit" value="Change chatroom">
-        </form>
-
-        <br>
-
-        <textarea class="messagearea" id="chatmessages" readonly name="chatmessages" rows="4" cols="50"
-            placeholder="Welcome to the general chatroom, here messages from others will appear"></textarea>
-
-        <br>
-
-        <form id="chatroom-message">
-            <label for="message">Message:</label>
-            <input type="text" id="message" name="message"><br><br>
-            <input type="submit" value="Send message">
-        </form>
+    <h1>Chat Test Client</h1>
+    
+    <div>
+        <input id="token" type="text" placeholder="Your auth token" />
+        <button onclick="connect()">Connect</button>
+    </div>
+    
+    <div id="status">Disconnected</div>
+    
+    <div id="messages"></div>
+    
+    <div>
+        <input id="recipientId" type="text" placeholder="Recipient User ID" />
+        <input id="messageInput" type="text" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+    </div>
+    
+    <div>
+        <button onclick="getConversations()">Get Conversations</button>
+        <button onclick="uploadFile()">Upload Image</button>
+        <input id="fileInput" type="file" style="display:none" onchange="handleFileSelect(event)" />
     </div>
 
+    <script>
+        let ws = null;
+        let currentUserId = null;
 
-    <script type="text/javascript">
-         class NewMessageEvent {
-            constructor(message, from, sent) {
-                this.message = message;
-                this.from = from;
-                this.sent = sent;
-            }
-        }
-                class SendMessageEvent {
-            constructor(message, from) {
-                this.message = message;
-                this.from = from;
-            }
-        }
-
-        var selectedchat = "general";
-        let conn = null
-        class Event {
-            constructor(type,payload){
-                this.type = type
-                this.payload = payload
-            }
-        }
-
-        function routeEvent(event) {
-            if (event.type == undefined) {
-                alert("message type is undefiend")
-            }
-            switch (event.type){
-                case  "new_message": {
-                    console.log("new message")
-                    break
-                }
-                default: {
-                    console.log("unknown type")
-                    break
-                }
-            }
-        }
-        function sendEvent(type, payload){
-            const event = new Event(type,payload)
-            conn.send(JSON.stringify(event))
+        function connect() {
+            const token = document.getElementById('token').value;
+            
+            // WebSocket connection with token as query parameter
+            ws = new WebSocket(`ws://localhost:9000/ws?token=${token}`);
+            
+            ws.onopen = () => {
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').style.color = 'green';
+                console.log('WebSocket connected');
+            };
+            
+            ws.onmessage = (event) => {
+                console.log('Received:', event.data);
+                const message = JSON.parse(event.data);
+                handleIncomingEvent(message);
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
+            
+            ws.onclose = () => {
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').style.color = 'red';
+                console.log('WebSocket disconnected');
+            };
         }
 
-      function changeChatRoom() {
-            // Change Header to reflect the Changed chatroom
-            var newchat = document.getElementById("chatroom");
-            if (newchat != null && newchat.value != selectedchat) {
-                selectedchat = newchat.value;
-                header = document.getElementById("chat-header").innerHTML = "Currently in chat: " + selectedchat;
-
-                let changeEvent = new ChangeChatRoomEvent(selectedchat);
-                sendEvent("change_room", changeEvent);
-                textarea = document.getElementById("chatmessages");
-                textarea.innerHTML = `You changed room into: ${selectedchat}`;
-            }
-            return false;
-        }
-
-         
-        window.onload =async function () {
-            document.getElementById("chatroom-selection").onsubmit = changeChatRoom;
-            document.getElementById("chatroom-message").onsubmit = sendMessage;
-            if (window["WebSocket"]) {
-                console.log("supports websockets");
-               
-               conn = new WebSocket("ws://localhost:9000/ws?token=XJWLSK2TJAH6YAOZVQNQPN6V2OM67THKA6ZNC4OLEXIV6YZVUK3Q");
-               conn.onmessage = function(evt) {
-                    console.log(evt);
-                    const eventData = JSON.parse(evt.data)
-                    const event = Object.assign(new Event, eventData)
-                    routeEvent(event)
-                }
-            } else {
-                alert("Not supporting websockets");
-            }
-        };
-      function sendMessage() {
-            var newmessage = document.getElementById("message");
-            if (newmessage != null) {
-                let outgoingEvent = new SendMessageEvent(newmessage.value, "percy");
-                sendEvent("send_message", outgoingEvent)
-            }
-            return false;
-        }
-           function appendChatMessage(messageEvent) {
-            var date = new Date(messageEvent.sent);
-            // format message
-            const formattedMsg = `${date.toLocaleString()}: ${messageEvent.message}`;
-            // Append Message
-            textarea = document.getElementById("chatmessages");
-            textarea.innerHTML = textarea.innerHTML + "\n" + formattedMsg;
-            textarea.scrollTop = textarea.scrollHeight;
-        }
-             function routeEvent(event) {
-
-            if (event.type === undefined) {
-                alert("no 'type' field in event");
-            }
-            switch (event.type) {
-                case "new_message":
-                    // Format payload
-                    const messageEvent = Object.assign(new NewMessageEvent, event.payload);
-                    appendChatMessage(messageEvent);
+        function handleIncomingEvent(event) {
+            const messagesDiv = document.getElementById('messages');
+            
+            switch(event.type) {
+                case 'new_message':
+                    const payload = event.payload;
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = 'message';
+                    msgDiv.textContent = `${payload.sender_id}: ${payload.content}`;
+                    messagesDiv.appendChild(msgDiv);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
                     break;
+                    
+                case 'conversations_list':
+                    console.log('Conversations:', event.payload);
+                    displayConversations(event.payload.conversations);
+                    break;
+                    
+                case 'messages_list':
+                    console.log('Messages:', event.payload);
+                    displayMessages(event.payload.messages);
+                    break;
+                    
                 default:
-                    alert("unsupported message type");
-                    break;
+                    console.log('Unknown event type:', event.type);
             }
-
         }
-        class ChangeChatRoomEvent {
-            constructor(name) {
-                this.name = name;
+
+        function sendMessage() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to WebSocket');
+                return;
+            }
+            
+            const recipientId = document.getElementById('recipientId').value;
+            const messageText = document.getElementById('messageInput').value;
+            
+            if (!recipientId || !messageText) {
+                alert('Please enter recipient ID and message');
+                return;
+            }
+            
+            const event = {
+                type: 'send_message',
+                payload: {
+                    recipient_id: recipientId,
+                    content: messageText,
+                    message_type: 'text'
+                }
+            };
+            
+            ws.send(JSON.stringify(event));
+            document.getElementById('messageInput').value = '';
+        }
+
+        function getConversations() {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                alert('Not connected to WebSocket');
+                return;
+            }
+            
+            const event = {
+                type: 'get_conversations',
+                payload: {}
+            };
+            
+            ws.send(JSON.stringify(event));
+        }
+
+        function displayConversations(conversations) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<h3>Your Conversations:</h3>';
+            
+            conversations.forEach(conv => {
+                const div = document.createElement('div');
+                div.className = 'message';
+                div.innerHTML = `
+                    <strong>${conv.type === 'group' ? conv.name : 'Direct Chat'}</strong><br>
+                    ID: ${conv.id}<br>
+                    Unread: ${conv.unread_count}<br>
+                    ${conv.last_message ? 'Last: ' + conv.last_message.content : 'No messages'}
+                `;
+                messagesDiv.appendChild(div);
+            });
+        }
+
+        function displayMessages(messages) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<h3>Messages:</h3>';
+            
+            messages.reverse().forEach(msg => {
+                const div = document.createElement('div');
+                div.className = 'message';
+                div.textContent = `${msg.sender_id}: ${msg.content}`;
+                messagesDiv.appendChild(div);
+            });
+        }
+
+        function uploadFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const token = document.getElementById('token').value;
+            const recipientId = document.getElementById('recipientId').value;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('recipient_id', recipientId);
+            formData.append('caption', 'Check this out!');
+            
+            try {
+                const response = await fetch('http://localhost:9000/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                console.log('Upload result:', result);
+                alert('File uploaded successfully!');
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed');
             }
         }
     </script>
-
-    <style type="text/css">
-        body {
-            overflow: hidden;
-            padding: 0;
-            margin: 0;
-            width: 100%;
-            height: 100%;
-            background: rgb(66, 56, 56);
-        }
-
-        .center {
-            margin: auto;
-            width: 50%;
-            border: 3px solid green;
-            padding: 10px;
-        }
-    </style>
-
 </body>
-
 </html>

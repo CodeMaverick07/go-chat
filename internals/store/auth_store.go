@@ -60,7 +60,7 @@ func (p *PostgresOTPStore) SendOTP(username string, email string, purpose OTPPur
 	VALUES ($1,$2,$3,$4)
 	RETURNING id
 	`
-	var id string
+	var id uuid.UUID
 	err = p.DB.QueryRow(query, email, otpHash, purpose, otp.ExpiresAt).Scan(&id)
 	if err != nil {
 		return err
