@@ -12,7 +12,7 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		panic(err)
+		// .env might not exist, but let's check
 	}
 	app, err := app.NewApplication()
 	if err != nil {
@@ -23,13 +23,13 @@ func main() {
 	defer app.DB.Close()
 	app.Logger.Println("first log from main.go")
 	server := &http.Server{
-		Addr:         ":9000",
+		Addr:         ":8080",
 		Handler:      r,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
-	app.Logger.Println("starting server on port 9000")
+	app.Logger.Println("starting server on port 8080")
 	err = server.ListenAndServe()
 	if err != nil {
 		app.Logger.Fatal("error starting server: %w", err)

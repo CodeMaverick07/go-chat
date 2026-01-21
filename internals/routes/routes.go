@@ -11,8 +11,8 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 	router := chi.NewRouter()
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{
-			"http://127.0.0.1:5500",
-			"http://localhost:5500",
+			"http://127.0.0.1:3000",
+			"http://localhost:3000",
 		},
 		AllowedMethods: []string{
 			"GET", "POST", "OPTIONS",
@@ -29,7 +29,7 @@ func SetupRoutes(app *app.Application) *chi.Mux {
 		MaxAge:           300,
 	}))
 
-	// Protected routes (require authentication)
+	// Protected routes
 	router.Group(func(r chi.Router) {
 		r.Use(app.UserMiddlewareHandler.Authenticate)
 		r.Post("/socket-token", app.UserHandler.WebsocketTokenHandler)
